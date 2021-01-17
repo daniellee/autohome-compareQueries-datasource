@@ -132,8 +132,12 @@ define(['angular', 'lodash', 'moment'], function(angular, _, moment) {
                     if (line.target) {
                       line.target = line.target + '_' + timeShiftAlias
                       typeof line.title != 'undefined' && line.title != null && (line.title = line.title + '_' + timeShiftAlias)
-                    } else if (line.fields) {
+                    } else if (line.fields && line.name) {
                       line.name = line.name + '_' + timeShiftAlias
+                    } else if (line.fields) {
+                      line.fields.forEach(function(field) {
+                        field.name = field.name + '_' + timeShiftAlias
+                      })
                     }
 
                     if (target.process) {
@@ -150,6 +154,14 @@ define(['angular', 'lodash', 'moment'], function(angular, _, moment) {
                           line.datapoints.forEach(function(datapoint) {
                             datapoint[1] = datapoint[1] + timeShift_ms
                           })
+                        } else if (line.fields) {
+                          line = new MutableDataFrame(line)
+
+                          const timeField = line.fields.find(field => field.type === 'time');
+                          for (let i = 0; i < line.length; i++) {
+                            console.log(timeField.values.get(i), timeField.values.get(i) + timeShift_ms)
+                            timeField.values.set(i, timeField.values.get(i) + timeShift_ms)
+                          }
                         }
                       }
                     }
