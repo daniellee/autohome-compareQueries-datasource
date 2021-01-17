@@ -1,6 +1,8 @@
 import _ from 'lodash';
 import moment from 'moment'; // eslint-disable-line no-restricted-imports
 
+import { ArrayVector, MutableField } from '@grafana/data';
+
 export class CompareQueriesDatasource {
   datasourceSrv: any;
   $q: any;
@@ -116,14 +118,20 @@ export class CompareQueriesDatasource {
               .then(function(compareResult) {
                 var data = compareResult.data;
                 data.forEach(function(line) {
-                  // if old time series format else if new data frames format
                   if (line.target) {
+                    // if old time series format
                     line.target = line.target + '_' + timeShiftAlias;
                     typeof line.title !== 'undefined' &&
-                      line.title !== null &&
+                      line.title != null &&
                       (line.title = line.title + '_' + timeShiftAlias);
-                  } else if (line.fields) {
+                  } else if (line.fields && line.name) {
+                    //else if new data frames format with single series
                     line.name = line.name + '_' + timeShiftAlias;
+                  } else if (line.fields) {
+                    //else if new data frames format with multiple series
+                    line.fields.forEach(function(field) {
+                      field.name = field.name + '_' + timeShiftAlias;
+                    });
                   }
 
                   if (target.process) {
@@ -137,9 +145,28 @@ export class CompareQueriesDatasource {
                       }
                     } else {
                       if (line.datapoints) {
+                        // if old time series format
                         line.datapoints.forEach(function(datapoint) {
                           datapoint[1] = datapoint[1] + timeShift_ms;
                         });
+                      } else if (line.fields && line.fields.length > 0) {
+                        //else if new data frames format
+                        const unshiftedTimeField = line.fields.find(field => field.type === 'time');
+
+                        if (unshiftedTimeField) {
+                          const timeField: MutableField = {
+                            name: unshiftedTimeField.name,
+                            type: unshiftedTimeField.type,
+                            config: unshiftedTimeField.config || {},
+                            labels: unshiftedTimeField.labels,
+                            values: new ArrayVector(),
+                          };
+
+                          for (let i = 0; i < line.length; i++) {
+                            timeField.values.set(i, unshiftedTimeField.values.get(i) + timeShift_ms);
+                          }
+                          line.fields[0] = timeField;
+                        }
                       }
                     }
                   }
